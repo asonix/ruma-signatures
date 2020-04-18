@@ -115,3 +115,13 @@ pub type PublicKeyMap = HashMap<String, PublicKeySet>;
 ///
 /// This is represented as a map from key ID to Base64-encoded signature.
 pub type PublicKeySet = HashMap<String, String>;
+
+#[cfg(test)]
+mod tests {
+    use super::Ed25519KeyPair;
+
+    #[test]
+    fn generate_key() {
+        Ed25519KeyPair::generate().unwrap();
+    }
+}
