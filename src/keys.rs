@@ -5,7 +5,7 @@ use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
 };
 
-use ring::signature::Ed25519KeyPair as RingEd25519KeyPair;
+use ring::signature::{Ed25519KeyPair as RingEd25519KeyPair, KeyPair as _};
 
 use crate::{signatures::Signature, Algorithm, Error};
 
@@ -57,6 +57,27 @@ impl Ed25519KeyPair {
             private_key: private_key.to_owned(),
             version,
         })
+    }
+
+    /// Generates a new key pair.
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple of (private_key, public_key)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the generation failed.
+    pub fn generate() -> Result<(Vec<u8>, Vec<u8>), Error> {
+        let seed: [u8; 32] = ring::rand::generate(&ring::rand::SystemRandom::new())
+            .map_err(|e| Error::new(e.to_string()))?
+            .expose();
+
+        // this works because ring expects a 32-byte key (and will fail on non-32-byte keys)
+        let ed25519keypair = RingEd25519KeyPair::from_seed_unchecked(&seed).unwrap();
+        let public_key: Vec<u8> = ed25519keypair.public_key().as_ref().to_vec();
+
+        Ok((seed.to_vec(), public_key))
     }
 }
 
