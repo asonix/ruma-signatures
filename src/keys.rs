@@ -5,7 +5,7 @@ use std::{
     fmt::{Debug, Formatter, Result as FmtResult},
 };
 
-use ring::signature::Ed25519KeyPair as RingEd25519KeyPair;
+use ring::signature::{Ed25519KeyPair as RingEd25519KeyPair, KeyPair as _};
 
 use crate::{signatures::Signature, Algorithm, Error};
 
@@ -20,11 +20,9 @@ pub trait KeyPair: Sized {
 }
 
 /// An Ed25519 key pair.
-#[derive(Clone, PartialEq)]
 pub struct Ed25519KeyPair {
-    /// pkcs8 encoded Private/Public Key document
-    /// The public key.
-    document: Vec<u8>,
+    /// Ring's Keypair type
+    keypair: RingEd25519KeyPair,
 
     /// The version of the key pair.
     version: String,
@@ -45,14 +43,10 @@ impl Ed25519KeyPair {
     /// Returns an error if the public and private keys provided are invalid for the implementing
     /// algorithm.
     pub fn new(document: &[u8], version: String) -> Result<Self, Error> {
-        if let Err(error) = RingEd25519KeyPair::from_pkcs8(document) {
-            return Err(Error::new(error.to_string()));
-        }
+        let keypair = RingEd25519KeyPair::from_pkcs8(document)
+            .map_err(|error| Error::new(error.to_string()))?;
 
-        Ok(Self {
-            document: document.to_owned(),
-            version,
-        })
+        Ok(Self { keypair, version })
     }
 
     /// Generates a new key pair.
@@ -74,12 +68,9 @@ impl Ed25519KeyPair {
 
 impl KeyPair for Ed25519KeyPair {
     fn sign(&self, message: &[u8]) -> Signature {
-        // Okay to unwrap because we verified the input in `new`.
-        let ring_key_pair = RingEd25519KeyPair::from_pkcs8(&self.document).unwrap();
-
         Signature {
             algorithm: Algorithm::Ed25519,
-            signature: ring_key_pair.sign(message).as_ref().to_vec(),
+            signature: self.keypair.sign(message).as_ref().to_vec(),
             version: self.version.clone(),
         }
     }
@@ -89,6 +80,7 @@ impl Debug for Ed25519KeyPair {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> FmtResult {
         formatter
             .debug_struct("Ed25519KeyPair")
+            .field("public_key", &self.keypair.public_key())
             .field("version", &self.version)
             .finish()
     }
